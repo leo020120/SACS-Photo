@@ -104,7 +104,7 @@ module.exports = app.storageBlob("SACSPhotoVerify", {
 
     async function photoVerify(imageUrl, BwImg) {
       //set up keys, endpoints etc for face api
-      const subscriptionKey = "9434226f8f0e488b952d4c617dfa3ab4"; //make this more secure
+      const subscriptionKey = ""; //make this more secure
       const endpoint = "https://photoappface.cognitiveservices.azure.com/";
       const faceApiUrl = `${endpoint}/face/v1.0/detect`;
       const headers = {
