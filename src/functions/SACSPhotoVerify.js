@@ -1,3 +1,4 @@
+const dotenv = require("dotenv").config();
 const { app } = require("@azure/functions");
 const { BlobServiceClient } = require("@azure/storage-blob");
 const { v4: uuidv4 } = require("uuid");
@@ -32,14 +33,12 @@ module.exports = app.storageBlob("SACSPhotoVerify", {
     const sourceContainerName = "images";
     const sourceContainerClient =
       blobServiceClient.getContainerClient(sourceContainerName);
-    //context.log(`Get a reference to the source container (images) `);
 
     // Get a reference to the destination container (thumbnails)
     const destinationContainerName = "thumbnails";
     const destinationContainerClient = blobServiceClient.getContainerClient(
       destinationContainerName
     );
-    context.log(`Get a reference to the destination container (thumbnails)`);
 
     // Access the blob name from the trigger metadata
     const blobName = context.triggerMetadata.name;
@@ -52,10 +51,9 @@ module.exports = app.storageBlob("SACSPhotoVerify", {
     const imageUrl = blobUrl;
     context.log("This is the ImageURL:", imageUrl);
 
-    /**
-     * AUTHENTICATE
-    //  * This single client is used for all examples.
-    //  */
+    //////////////////////FINISH CONNECT TO STORAGE ACCOUNT AND CONTAINER/////////////////////////////////
+
+    // Create ComputerVision Client and authenticate
     const key = process.env.VISION_KEY;
     const endpoint = process.env.VISION_ENDPOINT;
 
@@ -63,9 +61,9 @@ module.exports = app.storageBlob("SACSPhotoVerify", {
       new ApiKeyCredentials({ inHeader: { "Ocp-Apim-Subscription-Key": key } }),
       endpoint
     );
-    /**
-     * END - Authenticate
-     */
+
+    // Get the visual feature for analysis
+    const features = ["Color"];
 
     //initialise users email address
     const emailAddress = "leo.palmer@imperial.ac.uk"; //This is to become a variable passed in with the email address of the student
@@ -73,9 +71,10 @@ module.exports = app.storageBlob("SACSPhotoVerify", {
     const describeURL = imageUrl;
     context.log("This is the describeURL:", describeURL);
 
-    // // Get the visual feature for analysis
-    const features = ["Color"];
+    /////////////////////PHOTO VERIFICATION//////////////////////////////////////
+    //////////////Can this be called as a seperate component to tidy it up?////////////////////////
 
+    //Use ComputerVision/AnalyzeImage to check whether the image is B&W. Result passed to photoVerify function.
     async function analyzeImage(describeURL) {
       try {
         // Analyze the image using the Computer Vision service
@@ -94,24 +93,22 @@ module.exports = app.storageBlob("SACSPhotoVerify", {
         return colorTest;
       } catch (error) {
         console.log(`COLOR ERROR: ${error}`);
-        throw error; // Optionally re-throw the error if you want to propagate it.
+        throw error;
       }
     }
     const BwImg = await analyzeImage(describeURL);
 
-    /////////////////////PHOTO VERIFICATION//////////////////////////////////////
-    //////////////Can this be called as a seperate component to tidy it up?////////////////////////
+    //set up keys, endpoints etc for face api
+    const faceKey = process.env.FACE_KEY;
+    const faceEndpoint = process.env.FACE_ENDPOINT;
+    const faceApiUrl = `${faceEndpoint}/face/v1.0/detect`;
+    const headers = {
+      "Ocp-Apim-Subscription-Key": faceKey,
+      "Content-Type": "application/json",
+    };
 
+    //photoVerify function using Face API to do checks
     async function photoVerify(imageUrl, BwImg) {
-      //set up keys, endpoints etc for face api
-      const subscriptionKey = ""; //make this more secure
-      const endpoint = "https://photoappface.cognitiveservices.azure.com/";
-      const faceApiUrl = `${endpoint}/face/v1.0/detect`;
-      const headers = {
-        "Ocp-Apim-Subscription-Key": subscriptionKey,
-        "Content-Type": "application/json",
-      };
-
       const BlackWhite = BwImg;
       console.log("BLACKWHITE", BlackWhite);
 
@@ -126,7 +123,7 @@ module.exports = app.storageBlob("SACSPhotoVerify", {
       const data = { url: imageUrl };
       console.log("DATA", data);
 
-      //post the photo data to the face api and retrieve the results
+      //post the photo data to the face api with params and retrieve the results
       const response = await fetch(`${faceApiUrl}?${params}`, {
         method: "POST",
         headers: headers,
@@ -139,7 +136,7 @@ module.exports = app.storageBlob("SACSPhotoVerify", {
       //initialise resultDict object to carry check results
       let resultDict = {};
 
-      //check to see if there are any faces at all in photo. If not, send an email saying so, otherwise continue with checks.
+      //check to see if there are any faces in photo. If not, send an email saying so, otherwise continue with checks.
       if (!faces.length) {
         noFaceEmail(emailAddress);
         return;
@@ -159,7 +156,6 @@ module.exports = app.storageBlob("SACSPhotoVerify", {
           console.log(`YAW VALUE: ${yawAngle}`);
           const glassesAttribute = faceAttributes.glasses;
           console.log(`What type of glasses?.. ${glassesAttribute}`);
-          //const glasses = accessories.some(item => item.type === "glasses");
           const headwear = accessories.some((item) => item.type === "headWear");
           const mask = accessories.some((item) => item.type === "mask");
           const notFacingCamera = function () {
