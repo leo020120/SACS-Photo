@@ -171,6 +171,7 @@ app.http("ReservationUnitFull", {
   authLevel: "function",
   handler: async (request, context) => {
     context.log(`Http function processed request for url "${request.url}"`);
+    context.log("HTTP STATUS", context.Response.StatusCode);
 
     //Get API key from request headers and test against expected key
     const requestApiKey = request.headers.get("x-functions-key");
